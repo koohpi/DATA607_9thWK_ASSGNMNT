@@ -3,6 +3,7 @@ title: "DATA 607 - Week 9th Assignment"
 author: "K00hPy <- Koohyar Pooladvand"
 date: "`r Sys.Date()`"
 output:
+  word_document: default
   html_document: default
   pdf_document: default
 editor_options:
@@ -60,6 +61,10 @@ library(tinytex)
 
 #surpass the error message for dplyr to not show the masking
 suppressPackageStartupMessages(library(dplyr))
+App_ID <- "6bf40060-9f35-42fb-88bc-3fe688ad144d"
+App_Key <- "yAnGSyHmmdYUTdAPQcR36cNdUKSj0RFa"
+show_secret <- "xN0Bv5ixR6kjSGxj"
+
 
 ```
 
@@ -80,10 +85,7 @@ I will be using `httr2` and `jsonlite` to retrieve and parse the data.
 
 url <- "https://api.nytimes.com/svc/books/v3/"
 
-App_ID <- "6bf40060-9f35-42fb-88bc-3fe688ad144d"
-App_Key <- "yAnGSyHmmdYUTdAPQcR36cNdUKSj0RFa"
-show_secret <- "xN0Bv5ixR6kjSGxj"
-
+ 
 Example_call_1 <- "https://api.nytimes.com/svc/books/v3/lists/current/hardcover-fiction.json?api-key=yourkey"
 
 Example_call_2 <- "https://api.nytimes.com/svc/books/v3/reviews.json?author=Stephen+King&api-key=yourkey"
