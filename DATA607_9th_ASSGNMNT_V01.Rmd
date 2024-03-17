@@ -1,0 +1,209 @@
+---
+title: "DATA 607 - Week 9th Assignment"
+author: "K00hPy <- Koohyar Pooladvand"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The goal of this week's assignment is to work with APIs.
+
+We will work with the New York Times web site rich set of APIs, as
+described here: [New York Times
+APIs](https://developer.nytimes.com/apis). I first needt oestablish a
+secure way of working by signing up for an API key. My next task is as
+follow
+
+-   to choose one of the New York Times APIs,
+
+-   construct an interface in R to read in the JSON data,
+
+-   and transform it into an R DataFrame
+
+## Code Initiation
+
+Here I load the required libraries and ensure all the required packages
+are installed before running the following blocks of codes.
+
+```{r, Code_initialization, echo=FALSE, message=FALSE}
+required_packages <- c("RSQLite","devtools","tidyverse","DBI","dplyr","odbc","openintro","ggplot2","psych","reshape2","knitr","markdown","shiny","R.rsp","fivethirtyeight","RCurl", "stringr","readr","glue","data.table", "hflights", "jsonlite", "rjson", "XML", "xml2", "rvest", "readxl", "openxlsx", "httr2","kableExtra", "tinytex") # Specify packages
+
+not_installed <- required_packages[!(required_packages %in% installed.packages()[ , "Package"])]# Extract not installed packages
+if(length(not_installed)==0){
+  print("All required packages are installed")
+} else {
+  print(paste(length(not_installed), "package(s) had to be installed.")) # print the list of packages that need to be installed
+  install.packages(not_installed)
+}
+
+# define different paths to load the files 
+library(rvest)
+library(jsonlite)
+library(knitr)
+library(httr2)
+library(RCurl)
+library(stringr)
+library(kableExtra)
+library(tinytex)
+#tinytex::reinstall_tinytex(repository = "illinois")
+
+#surpass the error message for dplyr to not show the masking
+suppressPackageStartupMessages(library(dplyr))
+
+```
+
+## Working with httr2
+
+In this project, I will be working with httr2 to load data from the link. First things first, I have to create a token and sign up to be able to load data from the New York Times API.
+
+Many examples can be found on the NYTimes website under specific APIs, such as: [Books_API](https://developer.nytimes.com/docs/books-product/1/types/OverviewResponse).
+
+I will be using `httr2` and `jsonlite` to retrieve and parse the data.
+
+| Method | Endpoint                  | Description                                                        |
+|-----------------|-----------------|---------------------------------------|
+| GET    | /lists/full-overview.json | Get all books for all the Best Sellers lists for specified date.   |
+| GET    | /lists/overview.json      | Get top 5 books for all the Best Sellers lists for specified date. |
+
+```{r establish_connection, echo=TRUE}
+
+url <- "https://api.nytimes.com/svc/books/v3/"
+
+App_ID <- "6bf40060-9f35-42fb-88bc-3fe688ad144d"
+App_Key <- "yAnGSyHmmdYUTdAPQcR36cNdUKSj0RFa"
+show_secret <- "xN0Bv5ixR6kjSGxj"
+
+Example_call_1 <- "https://api.nytimes.com/svc/books/v3/lists/current/hardcover-fiction.json?api-key=yourkey"
+
+Example_call_2 <- "https://api.nytimes.com/svc/books/v3/reviews.json?author=Stephen+King&api-key=yourkey"
+
+
+
+# Define your API key
+
+# Construct the API call URL
+nyt_inquiry <- "lists/current/hardcover-fiction.json"
+
+#set and define the url_key with App_key to get the information using GET httr2 function
+url_key <- paste0(url,nyt_inquiry,"?api-key=", App_Key)
+
+# Make the API request
+req <- httr2::request(url_key) #stablish conenction 
+nyt_response <- httr2::req_perform(req) #use req_perfrom to get the data
+
+# test some additional information 
+nyt_response %>% resp_content_type()
+
+nyt_response %>% resp_status_desc()
+
+#nyt_response %>% resp_body_html()
+#nyt_response %>%resp_body_json()
+
+
+
+# Check if the request was successful if not pritn error 
+if (resp_content_type(nyt_response) == "application/json") {
+  # Parse the JSON response
+  data <- nyt_response %>% 
+    resp_body_json(check_type = TRUE, simplifyVector = FALSE)
+  
+    # Extract book titles 
+  books <- data$results$books
+  
+  # Check if books exist before accessing titles if not print no books
+  #define the DF
+  book_list <- data.frame(
+    Title = character(0),
+    Rank = integer(0),
+    Authors = character(0),
+    Publisher = character(0),
+    Book_image = character(0),
+    Book_file  = character(0)
+  )
+  
+  if (!is.null(books)) {
+    book_list <- data.frame(
+      Title = sapply(books, function(x) x$title),
+      Rank = sapply(books, function(x) x$rank),
+      Authors = sapply(books, function(x) x$author),
+      Publisher = sapply(books, function(x) x$publisher),
+      Book_image = sapply(books, function(x) x$book_image),
+      Book_file = character(length(books))
+      )
+
+    
+    book_list$Book_file <- sapply(books, function(x) {
+      image_url <- x$book_image
+      #print(image_url)
+      if (!is.null(image_url)) {
+        # Download image using read_html and content
+        tryCatch({
+          #define file_name
+          file_name <-  paste0("book_", x$title, "_", x$rank, ".jpg")
+          #check if the file has already been downlaoded
+          if (file.exists(file_name)) {
+            message("Image for ",  x$title ," has already been downloaded!")
+            } else {
+              download.file(image_url, file_name,
+                            mode = "wb")
+              message("Image for ", x$title, " is downloaded.")
+              }
+          #str_trim(x$title)
+          #img_src
+          return(file_name)
+          }, error = function(e) {
+            message("Error downloading image for: ", x$title)
+            return(NA)
+            })
+        } else {
+          NA
+          }
+      })
+
+    #print(books_title)
+    } else {
+      print("No books found in the response.")
+      }  
+  } else {
+    print("Error: Unable to retrieve data from the API.")
+  }
+
+```
+
+image_example: ![](book_WANDERING%20STARS_15.jpg)
+
+## Dispaly the result with image 
+In this section, I struggled quite a bit to display the images. Although I managed to download them, it took me a considerable amount of time to figure out how to show them. This solution may not seem ideal, but it’s better than nothing.
+
+```{r disply_image, echo=TRUE, results='asis' }
+
+message("This is the list of the top books in New York Times dated: ", data$last_modified)
+
+# Display the table of books using Kable
+kable(book_list[1:3], format = "html") %>%
+  kable_styling()
+
+WD_path <- getwd()
+
+knitr::include_graphics(book_list$Book_file)
+
+```
+
+
+## Conclusion 
+This week, we learned how to work with the New York Times APIs to download JSON files and extract data from them. I also used the image links in the JSON to download them into a folder and later display them in an HTML file.
+
+In general, the process was tricky and required following the exact way the APIs are set to work. It took me a couple of iterations to figure out how to get the information and extract data from the JSON. All in all, JSON is a friendly structure that allows us to elicit information, but it requires digging into the structure of the file to extract information meaningfully.
+
+## End
